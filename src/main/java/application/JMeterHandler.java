@@ -19,18 +19,14 @@ public class JMeterHandler {
 
 	private final PluginsCMDWorker worker;
 
-	public JMeterHandler(String filename) throws IOException, URISyntaxException {
-		URL resourceUrl = JMeterHandler.class.getResource("/jmeter-csv-parser/src/main/resources/saveservice.properties");
-		File saveServiceProps = new File(resourceUrl.toURI());
-		JMeterUtils.setProperty("saveservice.properties", FileUtils.readFileToString(saveServiceProps));
+	public JMeterHandler(String filename) throws URISyntaxException, IOException {
 		if (jmeterProps == null || tempDirectory == null) {
 			createJMeterEnv();
 		}
 
-		
-
 		worker = new PluginsCMDWorker();
 		worker.setInputFile(filename);
+		
 
 		worker.setGraphWidth(650);
 		worker.setGraphHeight(430);
@@ -51,10 +47,11 @@ public class JMeterHandler {
 			JMeterUtils.loadJMeterProperties(propsFile.getAbsolutePath());
 			JMeterUtils.setJMeterHome(new DirectoryAnchor().toString());
 			JMeterUtils.setLocale(new Locale("ignoreResources"));
+			
+			tempDirectory = propsFile.getParent() + "/";
+			jmeterProps = propsFile;
 		} catch (IOException ex) {
 			ex.printStackTrace(System.err);
 		}
-		tempDirectory = propsFile.getParent() + "/";
-		jmeterProps = propsFile;
 	}
 }
