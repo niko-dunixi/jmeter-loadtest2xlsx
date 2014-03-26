@@ -120,10 +120,21 @@
 			<artifactId>jmeter-plugins-extras</artifactId>
 			<version>${jmeterplugins.version}</version>
 		</dependency>
+<!-- 		<dependency> -->
+<!-- 			<groupId>org.apache.commons</groupId> -->
+<!-- 			<artifactId>commons-io</artifactId> -->
+<!-- 			<version>${apache.commons.io.version}</version> -->
+<!-- 		</dependency> -->
+
 		<dependency>
-			<groupId>org.apache.commons</groupId>
-			<artifactId>commons-io</artifactId>
-			<version>${apache.commons.io.version}</version>
+			<groupId>com.google.guava</groupId>
+			<artifactId>guava</artifactId>
+			<version>r03</version>
+		</dependency>
+		<dependency>
+			<groupId>com.google.guava</groupId>
+			<artifactId>guava-io</artifactId>
+			<version>r03</version>
 		</dependency>
 
 	</dependencies>
