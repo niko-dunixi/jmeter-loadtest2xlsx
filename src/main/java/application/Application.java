@@ -11,9 +11,7 @@ import org.apache.jmeter.util.JMeterUtils;
 public class Application {
 
 	private Application(String[] args) throws IOException, URISyntaxException {
-		String fileDir = "/home/paulbaker/LoadTest/Results/JMeter/JMeter/";
-		String file = "JmeterRawResults_20140324-0500_BASELINE.csv";
-		JMeterHandler jmeter = new JMeterHandler(fileDir + file);
+		JMeterHandler jmeter = new JMeterHandler(args[0]);
 	}
 
 	public static void main(String[] args) throws IOException, URISyntaxException {
