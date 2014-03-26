@@ -20,7 +20,6 @@ import kg.apc.jmeter.PluginsCMDWorker;
 
 public class JMeterHandler {
 
-	private static File jmeterProps;
 	private static String tempDirectory;
 
 	private final PluginsCMDWorker worker;
@@ -57,6 +56,9 @@ public class JMeterHandler {
 				BufferedWriter bw = new BufferedWriter(new FileWriter(tempPropsFile));
 				bw.write(Resources.toString(resourceUrl, Charsets.UTF_8));
 				bw.close();
+				if (tempDirectory == null){
+					tempDirectory = tempPropsFile.getParent() + "/";
+				}
 				if (prop.compareTo("jmeter") == 0) {
 					JMeterUtils.loadJMeterProperties(tempPropsFile.getAbsolutePath());
 				} else {
