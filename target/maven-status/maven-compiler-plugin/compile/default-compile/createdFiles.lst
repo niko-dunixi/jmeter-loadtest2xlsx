@@ -1,0 +1,4 @@
+application/Application.class
+application/JMeterHandlerParseException.class
+application/JMeterHandler.class
+application/JMeterHandlerSetupException.class
