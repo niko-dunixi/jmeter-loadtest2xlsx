@@ -34,7 +34,7 @@ public class JMeterHandler {
 		return new String(tempDirectory);
 	}
 
-	public void parseRawFile(String filename) throws JMeterHandlerParseException {
+	public void parseGraphs(String filename) throws JMeterHandlerParseException {
 		final String[] graphModes = { "TransactionsPerSecond", "ResponseTimesOverTime" };
 		final String resultNameBase = setupFileName(filename);
 
@@ -46,16 +46,6 @@ public class JMeterHandler {
 		worker.setGraphHeight(415);
 		worker.setRelativeTimes(0);
 		worker.setAutoScaleRows(0);
-
-		{ // summary file
-			worker.setPluginType("AggregateReport");
-			worker.addExportMode(PluginsCMDWorker.EXPORT_CSV);
-			worker.setOutputCSVFile(resultNameBase + "_Summary.csv");
-			int result;
-			if ((result = worker.doJob()) != 0) {
-				throw new JMeterHandlerParseException(result);
-			}
-		}
 
 		{ // graph files
 			worker.addExportMode(PluginsCMDWorker.EXPORT_PNG);
@@ -76,6 +66,24 @@ public class JMeterHandler {
 		}
 	}
 
+	public void parseSummary(String filename) throws JMeterHandlerParseException {
+		final String resultNameBase = setupFileName(filename);
+
+		final PluginsCMDWorker worker = new PluginsCMDWorker();
+		worker.setInputFile(filename);
+		{ // summary file
+			worker.setPluginType("AggregateReport");
+			worker.addExportMode(PluginsCMDWorker.EXPORT_CSV);
+			worker.setOutputCSVFile(tempDirectory + resultNameBase + "_Summary.csv");
+			int result;
+			if ((result = worker.doJob()) != 0) {
+				throw new JMeterHandlerParseException(result);
+			} else {
+				System.out.print("Summary creation was successful");
+			}
+		}
+	}
+
 	private String setupFileName(String filename) {
 		String resultNameBase = "RegexDidntMatch";
 		Pattern pattern = Pattern.compile("_(\\d+-\\w+)", Pattern.CASE_INSENSITIVE);
@@ -83,6 +91,8 @@ public class JMeterHandler {
 		if (matcher.find()) {
 			resultNameBase = matcher.group(1);
 		}
+		// with our filename scheme this should always match, unless you're
+		// being really stupid.
 		return resultNameBase;
 	}
 
