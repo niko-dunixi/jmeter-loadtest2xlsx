@@ -36,7 +36,7 @@ public class JMeterHandler {
 
 	public void parseGraphs(String filename) throws JMeterHandlerParseException {
 		final String[] graphModes = { "TransactionsPerSecond", "ResponseTimesOverTime" };
-		final String resultNameBase = setupFileName(filename);
+		final String resultNameBase = extractRelevantName(filename);
 
 		final PluginsCMDWorker worker = new PluginsCMDWorker();
 		worker.setInputFile(filename);
@@ -67,7 +67,7 @@ public class JMeterHandler {
 	}
 
 	public void parseSummary(String filename) throws JMeterHandlerParseException {
-		final String resultNameBase = setupFileName(filename);
+		final String resultNameBase = extractRelevantName(filename);
 
 		final PluginsCMDWorker worker = new PluginsCMDWorker();
 		worker.setInputFile(filename);
@@ -84,10 +84,10 @@ public class JMeterHandler {
 		}
 	}
 
-	private String setupFileName(String filename) {
+	public static String extractRelevantName(String fullFilename) {
 		String resultNameBase = "RegexDidntMatch";
 		Pattern pattern = Pattern.compile("_(\\d+-\\w+)", Pattern.CASE_INSENSITIVE);
-		Matcher matcher = pattern.matcher(filename);
+		Matcher matcher = pattern.matcher(fullFilename);
 		if (matcher.find()) {
 			resultNameBase = matcher.group(1);
 		}
@@ -110,7 +110,6 @@ public class JMeterHandler {
 				bufferedWriter.write(Resources.toString(resourceUrl, Charsets.UTF_8));
 				bufferedWriter.close();
 			}
-			System.out.println("nautilus " + getTempDir());
 			JMeterUtils.loadJMeterProperties(tempDir.toString() + "/bin/jmeter.properties");
 			JMeterUtils.setJMeterHome(tempDir.toString());
 			JMeterUtils.setLocale(new Locale("ignoreResources"));
