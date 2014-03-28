@@ -11,20 +11,15 @@ public class Application {
 			JMeterHandler jmeter = new JMeterHandler();
 			// only here for debugging purposes. This is obviously not
 			// permanent.
-			Runtime.getRuntime().exec("nautilus " + jmeter.getTempDir());
-			jmeter.parseSummary(baselineFilePath);
-			jmeter.parseGraphs(baselineFilePath);
-			jmeter.parseSummary(testFilePath);
-			jmeter.parseGraphs(testFilePath);
-		} catch (JMeterHandlerSetupException | JMeterHandlerParseException | IOException e) {
+			// Runtime.getRuntime().exec("nautilus " + jmeter.getTempDir());
+			jmeter.parseRawFile(baselineFilePath);
+			jmeter.parseRawFile(testFilePath);
+		} catch (JMeterHandlerSetupException | JMeterHandlerParseException /*| IOException*/ e) {
 			e.printStackTrace();
 		}
 	}
 
 	public static void main(String[] args) {
-		// for (String arg : args) {
-		// System.out.println(arg);
-		// }
 		// CLI validation
 		String[] files = null;
 		if ((files = validateArguments(args)) != null) {
@@ -83,6 +78,7 @@ public class Application {
 	}
 
 	private static void printUsage() {
+		// because we're helpful.
 		System.out.println("You're doing it wrong");
 	}
 }

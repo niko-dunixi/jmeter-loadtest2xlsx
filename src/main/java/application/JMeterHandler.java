@@ -2,15 +2,24 @@ package application;
 
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.security.DigestInputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.commons.lang.RandomStringUtils;
 import org.apache.jmeter.util.JMeterUtils;
 
 import com.google.common.base.Charsets;
@@ -34,9 +43,27 @@ public class JMeterHandler {
 		return new String(tempDirectory);
 	}
 
-	public void parseGraphs(String filename) throws JMeterHandlerParseException {
+	public String parseRawFile(String filename) throws JMeterHandlerParseException {
+		String userHomeDir = System.getProperty("user.home") + "/";
+		String testIdentifier = loadtestIdentifier(filename);
+		File resultsDirectory = new File(userHomeDir + ".jmeter-csv-parser/" + testIdentifier + "/");
+		resultsDirectory.mkdirs();
+
+		try {
+			Runtime.getRuntime().exec("nautilus " + resultsDirectory.toString());
+			// only here for debugging purposes. This is obviously not
+			// permanent.
+		} catch (IOException e) {
+		}
+
+		parseSummary(filename, resultsDirectory);
+		parseGraphs(filename, resultsDirectory);
+		return resultsDirectory.toString() + "/";
+	}
+
+	private void parseGraphs(String filename, File resultsDirectory) throws JMeterHandlerParseException {
 		final String[] graphModes = { "TransactionsPerSecond", "ResponseTimesOverTime" };
-		final String resultNameBase = extractRelevantName(filename);
+		final String resultNameBase = loadtestName(filename);
 
 		final PluginsCMDWorker worker = new PluginsCMDWorker();
 		worker.setInputFile(filename);
@@ -54,7 +81,14 @@ public class JMeterHandler {
 				for (int i = 0; i < 2; i++) {
 					worker.setSuccessFilter(i);
 					final String resultNameFull = resultNameBase + "_" + graphMode + "+" + (i == 0 ? "Fail" : "Success") + ".png";
-					worker.setOutputPNGFile(tempDirectory + resultNameFull);
+					Path path = Paths.get(resultsDirectory.toString() + "/" + resultNameFull);
+					if (Files.exists(path)) {
+						System.out.println(path.toString() + " already exists. Skipping.");
+						continue;
+					}
+					// worker.setOutputPNGFile(resultsDirectory.toString() +
+					// resultNameFull);
+					worker.setOutputPNGFile(path.toString());
 					int result;
 					if ((result = worker.doJob()) != 0) {
 						throw new JMeterHandlerParseException(result);
@@ -66,15 +100,23 @@ public class JMeterHandler {
 		}
 	}
 
-	public void parseSummary(String filename) throws JMeterHandlerParseException {
-		final String resultNameBase = extractRelevantName(filename);
+	private void parseSummary(String filename, File resultsDirectory) throws JMeterHandlerParseException {
+		final String resultNameBase = loadtestName(filename);
+
+		Path path = Paths.get(resultsDirectory.toString() + "/" + resultNameBase + "_Summary.csv");
+		if (Files.exists(path)) {
+			System.out.println(path.toString() + " already exists. Skipping.");
+			return;
+		}
 
 		final PluginsCMDWorker worker = new PluginsCMDWorker();
 		worker.setInputFile(filename);
 		{ // summary file
 			worker.setPluginType("AggregateReport");
 			worker.addExportMode(PluginsCMDWorker.EXPORT_CSV);
-			worker.setOutputCSVFile(tempDirectory + resultNameBase + "_Summary.csv");
+			// worker.setOutputCSVFile(resultsDirectory.toString() +
+			// resultNameBase + "_Summary.csv");
+			worker.setOutputCSVFile(path.toString());
 			int result;
 			if ((result = worker.doJob()) != 0) {
 				throw new JMeterHandlerParseException(result);
@@ -84,7 +126,17 @@ public class JMeterHandler {
 		}
 	}
 
-	public static String extractRelevantName(String fullFilename) {
+	public static String loadtestIdentifier(String filename) {
+		try (FileInputStream fis = new FileInputStream(filename)) {
+			return DigestUtils.md5Hex((InputStream) fis);
+		} catch (IOException e) {
+			e.printStackTrace();
+			System.out.println("MD5 couldn't be fully generated. This file is probably still being written to. Returning random string instead.");
+		}
+		return RandomStringUtils.randomAlphanumeric(32);
+	}
+
+	public static String loadtestName(String fullFilename) {
 		String resultNameBase = "RegexDidntMatch";
 		Pattern pattern = Pattern.compile("_(\\d+-\\w+)", Pattern.CASE_INSENSITIVE);
 		Matcher matcher = pattern.matcher(fullFilename);
