@@ -1,6 +1,5 @@
 package application;
 
-import java.io.IOException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -9,12 +8,11 @@ public class Application {
 	private Application(String baselineFilePath, String testFilePath) {
 		try {
 			JMeterHandler jmeter = new JMeterHandler();
-			// only here for debugging purposes. This is obviously not
-			// permanent.
-			// Runtime.getRuntime().exec("nautilus " + jmeter.getTempDir());
-			jmeter.parseRawFile(baselineFilePath);
-			jmeter.parseRawFile(testFilePath);
-		} catch (JMeterHandlerSetupException | JMeterHandlerParseException /*| IOException*/ e) {
+			String baslineFolder = jmeter.parseRawFile(baselineFilePath);
+			String resultsFolder = jmeter.parseRawFile(testFilePath);
+			new ExcelGenerator(baslineFolder, resultsFolder);
+			
+		} catch (JMeterHandlerSetupException | JMeterHandlerParseException e) {
 			e.printStackTrace();
 		}
 	}

@@ -1,5 +1,6 @@
 package application;
 
+import java.awt.Desktop;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
@@ -10,10 +11,6 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.security.DigestInputStream;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
 import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -44,21 +41,21 @@ public class JMeterHandler {
 	}
 
 	public String parseRawFile(String filename) throws JMeterHandlerParseException {
-		String userHomeDir = System.getProperty("user.home") + "/";
-		String testIdentifier = loadtestIdentifier(filename);
-		File resultsDirectory = new File(userHomeDir + ".jmeter-csv-parser/" + testIdentifier + "/");
+		final String userHomeDir = System.getProperty("user.home") + "/";
+		final String testIdentifier = loadtestIdentifier(filename);
+		final File resultsDirectory = new File(userHomeDir + ".jmeter-csv-parser/" + testIdentifier + "/");
 		resultsDirectory.mkdirs();
-
-		try {
-			Runtime.getRuntime().exec("nautilus " + resultsDirectory.toString());
-			// only here for debugging purposes. This is obviously not
-			// permanent.
-		} catch (IOException e) {
-		}
-
+		// openResultsFolder(resultsDirectory);
 		parseSummary(filename, resultsDirectory);
 		parseGraphs(filename, resultsDirectory);
 		return resultsDirectory.toString() + "/";
+	}
+
+	private void openResultsFolder(final File resultsDirectory) {
+		try {
+			Desktop.getDesktop().open(resultsDirectory);
+		} catch (IOException e) {
+		}
 	}
 
 	private void parseGraphs(String filename, File resultsDirectory) throws JMeterHandlerParseException {
@@ -80,7 +77,7 @@ public class JMeterHandler {
 				worker.setPluginType(graphMode);
 				for (int i = 0; i < 2; i++) {
 					worker.setSuccessFilter(i);
-					final String resultNameFull = resultNameBase + "_" + graphMode + "+" + (i == 0 ? "Fail" : "Success") + ".png";
+					final String resultNameFull = resultNameBase + "_" + graphMode + "_" + (i == 0 ? "Fail" : "Success") + ".png";
 					Path path = Paths.get(resultsDirectory.toString() + "/" + resultNameFull);
 					if (Files.exists(path)) {
 						System.out.println(path.toString() + " already exists. Skipping.");
