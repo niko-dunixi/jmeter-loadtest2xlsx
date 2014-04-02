@@ -25,7 +25,8 @@ import com.google.common.io.Resources;
 import kg.apc.jmeter.PluginsCMDWorker;
 
 public class JMeterHandler {
-
+	
+	private JMeterParsedResults parsedResults;
 	private String tempDirectory;
 
 	public JMeterHandler() throws JMeterHandlerSetupException {
