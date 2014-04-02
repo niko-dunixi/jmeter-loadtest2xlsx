@@ -24,13 +24,18 @@ import com.google.common.io.Resources;
 
 import kg.apc.jmeter.PluginsCMDWorker;
 
-public class JMeterHandler {
+public class JMeterHandler implements Runnable{
 	
 	private JMeterParsedResults parsedResults;
 	private String tempDirectory;
 
-	public JMeterHandler() throws JMeterHandlerSetupException {
+	public JMeterHandler(String filename) throws JMeterHandlerSetupException {
 		setupJMeter();
+	}
+	
+	@Override
+	public void run() {
+		
 	}
 
 	private void setTempDir(String tempPath) {
@@ -100,13 +105,11 @@ public class JMeterHandler {
 
 	private void parseSummary(String filename, File resultsDirectory) throws JMeterHandlerParseException {
 		final String resultNameBase = loadtestName(filename);
-
 		Path path = Paths.get(resultsDirectory.toString() + "/" + resultNameBase + "_Summary.csv");
 		if (Files.exists(path)) {
 			System.out.println(path.toString() + " already exists. Skipping.");
 			return;
 		}
-
 		final PluginsCMDWorker worker = new PluginsCMDWorker();
 		worker.setInputFile(filename);
 		{ // summary file
