@@ -1,31 +1,27 @@
 package application;
 
+import java.awt.Color;
 import java.awt.Desktop;
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.FileReader;
 import java.io.IOException;
-import java.lang.reflect.Array;
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.Iterator;
-import java.util.Collections;
 
 import org.apache.poi.hssf.util.CellReference;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.ClientAnchor;
+import org.apache.poi.ss.usermodel.CreationHelper;
 import org.apache.poi.ss.usermodel.DataFormat;
 import org.apache.poi.ss.usermodel.Drawing;
 import org.apache.poi.ss.usermodel.Row;
-import org.apache.poi.xssf.usermodel.XSSFCell;
+import org.apache.poi.ss.usermodel.Picture;
 import org.apache.poi.xssf.usermodel.XSSFCellStyle;
+import org.apache.poi.xssf.usermodel.XSSFColor;
 import org.apache.poi.xssf.usermodel.XSSFFont;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
@@ -33,6 +29,7 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 public class ExcelGenerator {
 
 	private final ArrayList<Integer> hiddenColumns = new ArrayList<Integer>() {
+		private static final long serialVersionUID = -660313218075841778L;
 		{
 			add(3);
 			add(4);
@@ -41,48 +38,75 @@ public class ExcelGenerator {
 			add(10);
 		}
 	};
-	private final int percentageColumn = 7;
-	private CellStyle hiddenStyle;
-	private CellStyle percentStyle;
-	private CellStyle titleStyle;
-
-	// private SortedSet<String> sampleNames;
-	// private Map<String, String[]> baselineCsv;
-	// private Map<String, String[]> testlineCsv;
+	private final ArrayList<Integer> percentageColumn = new ArrayList<Integer>() {
+		private static final long serialVersionUID = 3075748202378866049L;
+		{
+			add(7);
+			add(8);
+			add(9);
+		}
+	};
+	private XSSFCellStyle hiddenStyle;
+	private XSSFCellStyle percentStyle;
+	private XSSFCellStyle titleStyle;
+	private XSSFCellStyle failStyle;
+	private XSSFCellStyle warnStyle;
 
 	ExcelGenerator(List<JMeterParsedResults> loadtestResults) {
 
 		XSSFWorkbook excelDocument = new XSSFWorkbook();
 		initStyles(excelDocument);
 		XSSFSheet excelSheet = excelDocument.createSheet("JMeter");
-		// for (Integer i : hiddenColumns) {
-		// excelSheet.setColumnWidth(i, 0);
-		// excelSheet.setColumnHidden(i, true);
-		// excelSheet.setColumnWidth(i + 4 + 11, 0);
-		// excelSheet.setColumnHidden(i + 4 + 11, true);
-		// }
 
 		int maxDifferential = loadtestResults.get(0).getCsvMap().get("CSVHEADER").length;
-		SortedSet<String> sampleNames = new TreeSet<String>();
-		for (JMeterParsedResults loadtest : loadtestResults) {
-			sampleNames.addAll(loadtest.getCsvMap().keySet());
-		}
-		sampleNames.remove("CSVHEADER");
-		sampleNames.remove("TOTAL");
-
-		// {
-		// int row = 0;
-		// String sample = "CSVHEADER";
-		// boolean compairisonColumns = false;
-		// }
+		SortedSet<String> sampleNames = initSampleNames(loadtestResults);
 		doRowSample(loadtestResults, excelSheet, maxDifferential, 0, "CSVHEADER", false);
 		int lastRow = doExcelBody(loadtestResults, excelSheet, maxDifferential, sampleNames);
 		doRowSample(loadtestResults, excelSheet, maxDifferential, lastRow++, "CSVHEADER", false);
 		doRowSample(loadtestResults, excelSheet, maxDifferential, lastRow++, "TOTAL", true);
+		doFormatColumns(loadtestResults, excelSheet, maxDifferential);
+		lastRow += 4;
+		CreationHelper creationHelper = excelDocument.getCreationHelper();
+		Drawing drawing = excelSheet.createDrawingPatriarch();
+		// for(JMeterParsedResults loadtest : loadtestResults){
+		for (int i = 0; i < loadtestResults.size(); i++) {
+			List<byte[]> pictureArray = loadtestResults.get(i).getImages();
+			for (int j = 0; j < pictureArray.size(); j++) {
+				ClientAnchor anchor = creationHelper.createClientAnchor();
+				//anchor.setCol1((maxDifferential * i) + (4 * i) + maxDifferential);
+				//anchor.setRow1(lastRow + j * 10);
+				anchor.setCol1(i * maxDifferential + i * 4);
+				anchor.setCol2(anchor.getCol1() + maxDifferential);
+			    anchor.setRow1(lastRow + j * 16);
+			    anchor.setRow2(anchor.getRow1() + 16);
+			    
+				Picture pict = drawing.createPicture(anchor, excelDocument.addPicture(pictureArray.get(j), XSSFWorkbook.PICTURE_TYPE_PNG));
+				// pict.resize();
+			}
+		}
 
-		// excelSheet.autoSizeColumn(0);
-		// excelSheet.autoSizeColumn(4 + 11);
 		saveExcelToFile(excelDocument);
+	}
+
+	private SortedSet<String> initSampleNames(List<JMeterParsedResults> loadtestResults) {
+		SortedSet<String> sampleNames = new TreeSet<String>();
+		for (JMeterParsedResults loadtest : loadtestResults) {
+			sampleNames.addAll(loadtest.getCsvMap().keySet());
+			loadtest.getCsvMap().get("CSVHEADER")[0] = loadtest.getTestName();
+		}
+		sampleNames.remove("CSVHEADER");
+		sampleNames.remove("TOTAL");
+		return sampleNames;
+	}
+
+	private void doFormatColumns(List<JMeterParsedResults> loadtestResults, XSSFSheet excelSheet, int maxDifferential) {
+		for (int i = 0; i < loadtestResults.size(); i++) {
+			for (Integer j : hiddenColumns) {
+				excelSheet.setColumnWidth(j + (4 * i) + (maxDifferential * i), 0);
+				excelSheet.setColumnHidden(j + (4 * i) + (maxDifferential * i), true);
+			}
+			excelSheet.setColumnWidth(i * maxDifferential + i * 4, 6034); // 3.34"
+		}
 	}
 
 	private void initStyles(XSSFWorkbook excelDocument) {
@@ -99,9 +123,19 @@ public class ExcelGenerator {
 		bold.setFontHeight(10d);
 		titleStyle = excelDocument.createCellStyle();
 		titleStyle.setVerticalAlignment(CellStyle.VERTICAL_CENTER);
-		titleStyle.setAlignment(CellStyle.ALIGN_CENTER);
-		//titleStyle.setShrinkToFit(true);
+		// titleStyle.setAlignment(CellStyle.ALIGN_CENTER);
+		titleStyle.setAlignment(CellStyle.ALIGN_JUSTIFY);
 		titleStyle.setFont(bold);
+
+		XSSFFont failFont = excelDocument.createFont();
+		failFont.setColor(new XSSFColor(new Color(255, 0, 0)));
+		failStyle = excelDocument.createCellStyle();
+		failStyle.setFont(failFont);
+
+		XSSFFont warnFont = excelDocument.createFont();
+		warnFont.setColor(new XSSFColor(new Color(255, 255, 0)));
+		warnStyle = excelDocument.createCellStyle();
+		warnStyle.setFont(warnFont);
 	}
 
 	private void doRowSample(List<JMeterParsedResults> loadtestResults, XSSFSheet excelSheet, int maxDifferential, int row, String sample, boolean compairisonColumns) {
@@ -117,10 +151,10 @@ public class ExcelGenerator {
 				} catch (NumberFormatException e) {
 					currentCell.setCellValue(summaryData[j]);
 				}
-				if (!compairisonColumns){
+				if (!compairisonColumns) {
 					currentCell.setCellStyle(titleStyle);
 				}
-				if (i == percentageColumn) {
+				if (compairisonColumns && percentageColumn.contains(j)) {
 					currentCell.setCellStyle(percentStyle);
 				}
 			}
@@ -162,70 +196,6 @@ public class ExcelGenerator {
 		return currentRowIndex;
 	}
 
-	// private void setupExcelFooter(XSSFSheet excelSheet, int rowNum) {
-	// rowNum++;
-	// Row row = excelSheet.createRow((short) rowNum);
-	// addSamples(row, "TOTAL", 0, baselineCsv);
-	// processBodyCompairison(rowNum, row, "TOTAL", baselineCsv, testlineCsv);
-	// addSamples(row, "TOTAL", 4 + 11, testlineCsv);
-	// excelSheet.autoSizeColumn(0);
-	// excelSheet.autoSizeColumn(4 + 11);
-	// }
-	//
-	// private void processBodyCompairison(int rowNum, Row currentRow, String
-	// sampleName, Map<String, String[]> csvMapOne, Map<String, String[]>
-	// csvMapTwo) {
-	// if (csvMapOne.get(sampleName) != null && csvMapTwo.get(sampleName) !=
-	// null) {
-	// int rowAsAnInt = rowNum + 1;
-	// String avgFormula = "R" + rowAsAnInt + "/C" + rowAsAnInt;
-	// String errFormula = "W" + rowAsAnInt + "-H" + rowAsAnInt;
-	// Cell avgCell = currentRow.createCell(12, XSSFCell.CELL_TYPE_FORMULA);
-	// avgCell.setCellFormula(avgFormula);
-	// avgCell.setCellStyle(percentStyle);
-	// Cell errCell = currentRow.createCell(13, XSSFCell.CELL_TYPE_FORMULA);
-	// errCell.setCellFormula(errFormula);
-	// errCell.setCellStyle(percentStyle);
-	// }
-	// }
-	//
-	// private void addSamples(Row currentRow, String sampleName, int
-	// differential, Map<String, String[]> csvMap) {
-	// if (csvMap.get(sampleName) == null) {
-	// return;
-	// }
-	// int width = csvMap.get(sampleName).length;
-	// for (int i = 0; i < width; i++) {
-	// Cell currentCell = currentRow.createCell(i + differential);
-	// try {
-	// currentCell.setCellValue(Double.parseDouble(csvMap.get(sampleName)[i]));
-	// } catch (NumberFormatException e) {
-	// System.out.print("String: ");
-	// currentCell.setCellValue(csvMap.get(sampleName)[i]);
-	// }
-	// if (hiddenColumns.contains(i)) {
-	// currentCell.setCellStyle(hiddenStyle);
-	// }
-	// if (percentageColumn == i) {
-	// currentCell.setCellStyle(percentStyle);
-	// }
-	// System.out.println(csvMap.get(sampleName)[i]);
-	// }
-	// }
-	//
-	// private void cleaningSampleNames() {
-	// System.out.println("Cleaning the CSVHEADER and TOTAL from sample names. We place these manually.");
-	// sampleNames.remove("CSVHEADER");
-	// sampleNames.remove("TOTAL");
-	// }
-	//
-	// private void setupExcelHeader(XSSFSheet excelSheet) {
-	// // Creating header row
-	// Row row = excelSheet.createRow((short) 0);
-	// addSamples(row, "CSVHEADER", 0, baselineCsv);
-	// addSamples(row, "CSVHEADER", 4 + 11, testlineCsv);
-	// }
-	//
 	private void saveExcelToFile(XSSFWorkbook excelDocument) {
 		try {
 			File result = File.createTempFile("workbook", ".xlsx");
@@ -239,49 +209,4 @@ public class ExcelGenerator {
 			e.printStackTrace();
 		}
 	}
-	//
-	// private void parseSummaries(String baselineDirectory, String
-	// testlineDirectory) {
-	// baselineCsv = getSummaryMap(baselineDirectory);
-	// testlineCsv = getSummaryMap(testlineDirectory);
-	// sampleNames = new TreeSet<String>();
-	// {
-	// sampleNames.addAll(baselineCsv.keySet());
-	// sampleNames.addAll(testlineCsv.keySet());
-	// }
-	// cleaningSampleNames();
-	// }
-	//
-	// private Map<String, String[]> getSummaryMap(String directory) {
-	// String csvFile = iterateDirectory(directory, "_Summary.csv");
-	// Map<String, String[]> csvMap = new HashMap<String, String[]>();
-	// try (BufferedReader br = new BufferedReader(new FileReader(csvFile))) {
-	// String line;
-	// while ((line = br.readLine()) != null) {
-	// String[] values = line.split(",");
-	// if (values[0].compareTo("sampler_label") == 0) {
-	// csvMap.put("CSVHEADER", values);
-	// } else {
-	// csvMap.put(values[0], values);
-	// }
-	// }
-	// } catch (IOException e) {
-	// }
-	// return csvMap;
-	// }
-	//
-	// private static String iterateDirectory(String directory, String
-	// fileSuffix) {
-	// String result = null;
-	// File folder = new File(directory);
-	// File[] filesInDirectory = folder.listFiles();
-	// for (File file : filesInDirectory) {
-	// String currentFileString = file.getAbsolutePath();
-	// if (currentFileString.endsWith(fileSuffix)) {
-	// result = currentFileString;
-	// break;
-	// }
-	// }
-	// return result;
-	// }
 }

@@ -1,39 +1,25 @@
 package application;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import application.JMeterHandlerParseException;
+import application.JMeterHandlerSetupException;
 
 public class Application {
 
-	// private Application(String baselineFilePath, String testFilePath) {
-	// try {
-	// JMeterHandler jmeter = new JMeterHandler();
-	// String baslineFolder = jmeter.parseRawFile(baselineFilePath);
-	// String resultsFolder = jmeter.parseRawFile(testFilePath);
-	// new ExcelGenerator(baslineFolder, resultsFolder);
-	//
-	// } catch (JMeterHandlerSetupException | JMeterHandlerParseException e) {
-	// e.printStackTrace();
-	// }
-	// }
-
 	private Application(Set<String> filenames) throws JMeterHandlerSetupException, InterruptedException, ExecutionException {
 		List<JMeterParsedResults> results = parserThreading(filenames);
-		for(JMeterParsedResults j : results){
+		for (JMeterParsedResults j : results) {
 			System.out.println(j);
 		}
-		if (results.size() > 0){
-			ExcelGenerator x = new ExcelGenerator(results);
+		if (results.size() > 0) {
+			ExcelGenerator xlsx = new ExcelGenerator(results);
 		}
 	}
 

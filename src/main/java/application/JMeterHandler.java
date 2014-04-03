@@ -18,8 +18,6 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.Callable;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang.RandomStringUtils;
@@ -142,7 +140,7 @@ public class JMeterHandler implements Callable<JMeterParsedResults> {
 			worker.addExportMode(PluginsCMDWorker.EXPORT_PNG);
 			for (String graphMode : graphModes) {
 				worker.setPluginType(graphMode);
-				for (int i = 0; i < 2; i++) {
+				for (int i = 1; i >= 0; i--) {
 					worker.setSuccessFilter(i);
 					final String resultNameFull = resultNamePrefix + "_" + graphMode + "_" + (i == 0 ? "Fail" : "Success") + ".png";
 					Path path = Paths.get(resultsDirectory.toString() + "/" + resultNameFull);
@@ -179,15 +177,9 @@ public class JMeterHandler implements Callable<JMeterParsedResults> {
 
 	public static String loadtestName(String fullFilename) {
 		String resultNameBase = fullFilename.substring(fullFilename.lastIndexOf('/') + 1, fullFilename.lastIndexOf('.'));
-		// String resultNameBase = "RegexDidntMatch";
-		// Pattern pattern = Pattern.compile("_(\\d+-\\w+)",
-		// Pattern.CASE_INSENSITIVE);
-		// Matcher matcher = pattern.matcher(fullFilename);
-		// if (matcher.find()) {
-		// resultNameBase = matcher.group(1);
-		// }
-		// // with our filename scheme this should always match, unless you're
-		// // being really stupid.
+		if (resultNameBase.startsWith("JmeterRawResults_")){
+			resultNameBase = resultNameBase.substring(17);
+		}
 		return resultNameBase;
 	}
 }
