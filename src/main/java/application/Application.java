@@ -1,82 +1,51 @@
 package application;
 
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import application.JMeterHandlerParseException;
+import application.JMeterHandlerSetupException;
 
 public class Application {
 
-	private Application(String baselineFilePath, String testFilePath) {
-		try {
-			JMeterHandler jmeter = new JMeterHandler();
-			String baslineFolder = jmeter.parseRawFile(baselineFilePath);
-			String resultsFolder = jmeter.parseRawFile(testFilePath);
-			new ExcelGenerator(baslineFolder, resultsFolder);
-			
-		} catch (JMeterHandlerSetupException | JMeterHandlerParseException e) {
-			e.printStackTrace();
+	private Application(Set<String> filenames) throws JMeterHandlerSetupException, InterruptedException, ExecutionException {
+		List<JMeterParsedResults> results = parserThreading(filenames);
+		for (JMeterParsedResults j : results) {
+			System.out.println(j);
+		}
+		if (results.size() > 0) {
+			ExcelGenerator xlsx = new ExcelGenerator(results);
 		}
 	}
 
-	public static void main(String[] args) {
-		// CLI validation
-		String[] files = null;
-		if ((files = validateArguments(args)) != null) {
-			new Application(files[0], files[1]);
-		} else {
-			printUsage();
+	private List<JMeterParsedResults> parserThreading(Set<String> filenames) throws JMeterHandlerSetupException, InterruptedException, ExecutionException {
+		ExecutorService executor = Executors.newCachedThreadPool();
+		List<JMeterHandler> jmeterHandelers = new ArrayList<JMeterHandler>();
+		for (String filename : filenames) {
+			jmeterHandelers.add(new JMeterHandler(filename));
 		}
+		List<Future<JMeterParsedResults>> allParsers = executor.invokeAll(jmeterHandelers);
+		List<JMeterParsedResults> results = new ArrayList<JMeterParsedResults>();
+		for (Future<JMeterParsedResults> parser : allParsers) {
+			results.add(parser.get());
+		}
+		executor.shutdown();
+		return results;
 	}
 
-	public static String[] validateArguments(String[] args) {
-		try {
-			String baselineFilePath = null;
-			String testFilePath = null;
-			for (String argument : args) {
-				char argChar = 'h';
-				if (argument.length() > 2) {
-					argChar = argument.charAt(1);
-				}
-				switch (argChar) {
-				case 'b':
-					if (baselineFilePath != null) {
-						throw new YourArgumentIsInvalid();
-					}
-					baselineFilePath = parseArgumentRegex(argument);
-					break;
-				case 't':
-					if (testFilePath != null) {
-						throw new YourArgumentIsInvalid();
-					}
-					testFilePath = parseArgumentRegex(argument);
-					break;
-				case 'h':
-				default:
-					throw new YourArgumentIsInvalid();
-				}
-			}
-			if (baselineFilePath == null || testFilePath == null) {
-				throw new YourArgumentIsInvalid();
-			}
-			return new String[] { baselineFilePath, testFilePath };
-		} catch (YourArgumentIsInvalid e) {
-			return null;
+	public static void main(String[] args) throws YourArgumentIsInvalid, JMeterHandlerSetupException, InterruptedException, ExecutionException {
+		Set<String> filenames = new TreeSet<String>();
+		for (String filename : args) {
+			filenames.add(filename);
 		}
-	}
-
-	public static String parseArgumentRegex(String argument) throws YourArgumentIsInvalid {
-		String result = "";
-		Pattern pattern = Pattern.compile("^-[a-z]{1}=(.+)$", Pattern.CASE_INSENSITIVE);
-		Matcher matcher = pattern.matcher(argument);
-		if (matcher.find()) {
-			result = matcher.group(1);
-		} else {
+		if (filenames.size() <= 1) {
 			throw new YourArgumentIsInvalid();
 		}
-		return result;
-	}
-
-	private static void printUsage() {
-		// because we're helpful.
-		System.out.println("You're doing it wrong");
+		new Application(filenames);
 	}
 }
