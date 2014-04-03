@@ -77,7 +77,8 @@ public class ExcelGenerator {
 		// }
 		doRowSample(loadtestResults, excelSheet, maxDifferential, 0, "CSVHEADER", false);
 		int lastRow = doExcelBody(loadtestResults, excelSheet, maxDifferential, sampleNames);
-		doRowSample(loadtestResults, excelSheet, maxDifferential, lastRow, "TOTAL", true);
+		doRowSample(loadtestResults, excelSheet, maxDifferential, lastRow++, "CSVHEADER", false);
+		doRowSample(loadtestResults, excelSheet, maxDifferential, lastRow++, "TOTAL", true);
 
 		// excelSheet.autoSizeColumn(0);
 		// excelSheet.autoSizeColumn(4 + 11);
@@ -155,31 +156,7 @@ public class ExcelGenerator {
 		Iterator<String> sampleNameIterator = sampleNames.iterator();
 		while (sampleNameIterator.hasNext()) {
 			String currentSampleName = sampleNameIterator.next();
-			Row currentRow = excelSheet.createRow(currentRowIndex);
-			int currentDifferential = 0;
 			doRowSample(loadtestResults, excelSheet, maxDifferential, currentRowIndex, currentSampleName, true);
-			// for (int i = 0; i < loadtestResults.size(); i++) {
-			// JMeterParsedResults currentResults = loadtestResults.get(i);
-			// String[] summaryData =
-			// currentResults.getCsvMap().get(currentSampleName);
-			// for (int j = 0; j < summaryData.length; j++) {
-			// Cell currentCell = currentRow.createCell(currentDifferential +
-			// j);
-			// try {
-			// currentCell.setCellValue(Double.parseDouble(summaryData[j]));
-			// } catch (NumberFormatException e) {
-			// currentCell.setCellValue(summaryData[j]);
-			// }
-			// if (i == percentageColumn) {
-			// currentCell.setCellStyle(percentStyle);
-			// }
-			// }
-			// currentDifferential += maxDifferential;
-			// if (i + 1 != loadtestResults.size()) {
-			//
-			// }
-			// currentDifferential += 4;
-			// }
 			currentRowIndex++;
 		}
 		return currentRowIndex;
