@@ -12,6 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Locale;
+import java.util.concurrent.Callable;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -24,26 +25,57 @@ import com.google.common.io.Resources;
 
 import kg.apc.jmeter.PluginsCMDWorker;
 
-public class JMeterHandler implements Runnable{
-	
-	private JMeterParsedResults parsedResults;
-	private String tempDirectory;
+public class JMeterHandler implements Callable<JMeterParsedResults>, Comparable<JMeterHandler> {
+
+	private static boolean initialized = false;
+	private static int totalInstances = 0;
+	private int currentInstance = 0;
+	private static String cacheDirectory;
+	private final String rawResultsFilename;
+	private JMeterParsedResults parsedResults = null;
 
 	public JMeterHandler(String filename) throws JMeterHandlerSetupException {
+		rawResultsFilename = filename;
 		setupJMeter();
 	}
-	
+
 	@Override
-	public void run() {
+	public JMeterParsedResults call() throws JMeterHandlerParseException {
+		final String testIdentifier = loadtestIdentifier(rawResultsFilename);
+		final String testNamePrefix = loadtestName(rawResultsFilename);
+		final File resultsDirectory = new File(cacheDirectory+testIdentifier);
+		resultsDirectory.mkdirs();
+		parseSummary(rawResultsFilename, resultsDirectory);
+		parseGraphs(rawResultsFilename, resultsDirectory);
 		
+		return parsedResults;
 	}
 
-	private void setTempDir(String tempPath) {
-		tempDirectory = tempPath;
-	}
-
-	public String getTempDir() {
-		return new String(tempDirectory);
+	public synchronized void setupJMeter() throws JMeterHandlerSetupException {
+		if (initialized)
+			return;
+		final String[] props = { "jmeter", "saveservice", "system", "upgrade", "user" };
+		final String suffix = ".properties";
+		try {
+			final Path tempDir = Files.createTempDirectory("jmeter-csv-parser");
+			new File(tempDir + "/bin").mkdir();
+			for (String property : props) {
+				final URL resourceUrl = Resources.getResource(property + suffix);
+				final File tmpPropFile = new File(tempDir.toString() + "/bin", property + suffix);
+				BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(tmpPropFile));
+				bufferedWriter.write(Resources.toString(resourceUrl, Charsets.UTF_8));
+				bufferedWriter.close();
+			}
+			JMeterUtils.loadJMeterProperties(tempDir.toString() + "/bin/jmeter.properties");
+			JMeterUtils.setJMeterHome(tempDir.toString());
+			JMeterUtils.setLocale(new Locale("ignoreResources"));
+			cacheDirectory = System.getProperty("user.home") + "/.jmeter-csv-parser/";
+			currentInstance = totalInstances++;
+			initialized = true;
+		} catch (IOException e) {
+			e.printStackTrace();
+			throw new JMeterHandlerSetupException(e.getMessage());
+		}
 	}
 
 	public String parseRawFile(String filename) throws JMeterHandlerParseException {
@@ -149,26 +181,8 @@ public class JMeterHandler implements Runnable{
 		return resultNameBase;
 	}
 
-	public void setupJMeter() throws JMeterHandlerSetupException {
-		final String[] props = { "jmeter", "saveservice", "system", "upgrade", "user" };
-		final String suffix = ".properties";
-		try {
-			final Path tempDir = Files.createTempDirectory("jmeter-csv-parser");
-			setTempDir(tempDir.toString() + "/");
-			new File(tempDir + "/bin").mkdir();
-			for (String property : props) {
-				final URL resourceUrl = Resources.getResource(property + suffix);
-				final File tmpPropFile = new File(tempDir.toString() + "/bin", property + suffix);
-				BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(tmpPropFile));
-				bufferedWriter.write(Resources.toString(resourceUrl, Charsets.UTF_8));
-				bufferedWriter.close();
-			}
-			JMeterUtils.loadJMeterProperties(tempDir.toString() + "/bin/jmeter.properties");
-			JMeterUtils.setJMeterHome(tempDir.toString());
-			JMeterUtils.setLocale(new Locale("ignoreResources"));
-		} catch (IOException e) {
-			e.printStackTrace();
-			throw new JMeterHandlerSetupException(e.getMessage());
-		}
+	@Override
+	public int compareTo(JMeterHandler o) {
+		return this.currentInstance - o.currentInstance;
 	}
 }
