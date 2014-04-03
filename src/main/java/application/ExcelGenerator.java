@@ -18,6 +18,7 @@ import java.util.TreeSet;
 import java.util.Iterator;
 import java.util.Collections;
 
+import org.apache.poi.hssf.util.CellReference;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.DataFormat;
@@ -25,6 +26,7 @@ import org.apache.poi.ss.usermodel.Drawing;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.xssf.usermodel.XSSFCell;
 import org.apache.poi.xssf.usermodel.XSSFCellStyle;
+import org.apache.poi.xssf.usermodel.XSSFFont;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
@@ -40,8 +42,9 @@ public class ExcelGenerator {
 		}
 	};
 	private final int percentageColumn = 7;
-	private final CellStyle hiddenStyle;
-	private final CellStyle percentStyle;
+	private CellStyle hiddenStyle;
+	private CellStyle percentStyle;
+	private CellStyle titleStyle;
 
 	// private SortedSet<String> sampleNames;
 	// private Map<String, String[]> baselineCsv;
@@ -50,13 +53,7 @@ public class ExcelGenerator {
 	ExcelGenerator(List<JMeterParsedResults> loadtestResults) {
 
 		XSSFWorkbook excelDocument = new XSSFWorkbook();
-		DataFormat format = excelDocument.createDataFormat();
-		hiddenStyle = excelDocument.createCellStyle();
-		hiddenStyle.setHidden(true);
-		hiddenStyle.setDataFormat(format.getFormat(";;;"));
-		percentStyle = excelDocument.createCellStyle();
-		percentStyle.setDataFormat(format.getFormat("0.000%"));
-
+		initStyles(excelDocument);
 		XSSFSheet excelSheet = excelDocument.createSheet("JMeter");
 		// for (Integer i : hiddenColumns) {
 		// excelSheet.setColumnWidth(i, 0);
@@ -87,6 +84,25 @@ public class ExcelGenerator {
 		saveExcelToFile(excelDocument);
 	}
 
+	private void initStyles(XSSFWorkbook excelDocument) {
+		DataFormat format = excelDocument.createDataFormat();
+		hiddenStyle = excelDocument.createCellStyle();
+		hiddenStyle.setHidden(true);
+		hiddenStyle.setDataFormat(format.getFormat(";;;"));
+
+		percentStyle = excelDocument.createCellStyle();
+		percentStyle.setDataFormat(format.getFormat("0.000%"));
+
+		XSSFFont bold = excelDocument.createFont();
+		bold.setBold(true);
+		bold.setFontHeight(10d);
+		titleStyle = excelDocument.createCellStyle();
+		titleStyle.setVerticalAlignment(CellStyle.VERTICAL_CENTER);
+		titleStyle.setAlignment(CellStyle.ALIGN_CENTER);
+		//titleStyle.setShrinkToFit(true);
+		titleStyle.setFont(bold);
+	}
+
 	private void doRowSample(List<JMeterParsedResults> loadtestResults, XSSFSheet excelSheet, int maxDifferential, int row, String sample, boolean compairisonColumns) {
 		int currentDifferential = 0;
 		Row currentRow = excelSheet.createRow(row);// excelSheet.getRow(row);
@@ -95,19 +111,40 @@ public class ExcelGenerator {
 			String[] summaryData = currentResults.getCsvMap().get(sample);
 			for (int j = 0; j < summaryData.length; j++) {
 				Cell currentCell = currentRow.createCell(currentDifferential + j);
-				// currentCell.setCellValue(summaryData[j]);
 				try {
 					currentCell.setCellValue(Double.parseDouble(summaryData[j]));
 				} catch (NumberFormatException e) {
 					currentCell.setCellValue(summaryData[j]);
+				}
+				if (!compairisonColumns){
+					currentCell.setCellStyle(titleStyle);
 				}
 				if (i == percentageColumn) {
 					currentCell.setCellStyle(percentStyle);
 				}
 			}
 			currentDifferential += maxDifferential;
-			if (compairisonColumns) {
-
+			// System.out.println(currentDifferential);
+			if (compairisonColumns && i + 1 < loadtestResults.size()) {
+				// Average Response Times Comparison Column
+				Cell avgCell = currentRow.createCell(currentDifferential + 1);
+				String avgCellFormula = CellReference.convertNumToColString(currentDifferential + 6) + (row + 1) + " / "
+						+ CellReference.convertNumToColString(currentDifferential - 9) + (row + 1);
+				avgCell.setCellFormula(avgCellFormula);
+				avgCell.setCellStyle(percentStyle);
+				// Error Comparison Column
+				Cell errCell = currentRow.createCell(currentDifferential + 2);
+				String errCellFormula = CellReference.convertNumToColString(currentDifferential + 11) + (row + 1) + " - "
+						+ CellReference.convertNumToColString(currentDifferential - 4) + (row + 1);
+				errCell.setCellFormula(errCellFormula);
+				errCell.setCellStyle(percentStyle);
+			} else if (!compairisonColumns && i + 1 < loadtestResults.size()) {
+				Cell avgCell = currentRow.createCell(currentDifferential + 1);
+				avgCell.setCellValue("Avg / Avg");
+				avgCell.setCellStyle(titleStyle);
+				Cell errCell = currentRow.createCell(currentDifferential + 2);
+				errCell.setCellValue("Δ Error");
+				errCell.setCellStyle(titleStyle);
 			}
 			currentDifferential += 4;
 		}
