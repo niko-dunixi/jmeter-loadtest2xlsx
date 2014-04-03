@@ -52,6 +52,7 @@ public class JMeterHandler implements Callable<JMeterParsedResults>{
 		final String testNamePrefix = loadtestName(rawResultsFilename);
 		final File resultsDirectory = new File(cacheDirectory + testIdentifier);
 		resultsDirectory.mkdirs();
+		openResultsFolder(resultsDirectory);
 		Map<String, String[]> csvSummary = parseSummary(testNamePrefix, resultsDirectory);
 		ArrayList<byte[]> allGraphs = parseGraphs(testNamePrefix, resultsDirectory);
 		return new JMeterParsedResults(priority, testNamePrefix, csvSummary, allGraphs);
