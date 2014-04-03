@@ -29,8 +29,9 @@ public class Application {
 
 	private Application(Set<String> filenames) throws JMeterHandlerSetupException, InterruptedException, ExecutionException {
 		List<JMeterParsedResults> results = parserThreading(filenames);
-
-		results.clear();
+		for(JMeterParsedResults j : results){
+			System.out.println(j);
+		}
 	}
 
 	private List<JMeterParsedResults> parserThreading(Set<String> filenames) throws JMeterHandlerSetupException, InterruptedException, ExecutionException {

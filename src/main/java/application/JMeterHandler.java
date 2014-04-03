@@ -31,7 +31,7 @@ import com.google.common.io.Resources;
 
 import kg.apc.jmeter.PluginsCMDWorker;
 
-public class JMeterHandler implements Callable<JMeterParsedResults>{
+public class JMeterHandler implements Callable<JMeterParsedResults> {
 
 	private static boolean initialized = false;
 	private static int totalInstances = 0;
@@ -59,30 +59,30 @@ public class JMeterHandler implements Callable<JMeterParsedResults>{
 	}
 
 	public synchronized void setupJMeter() throws JMeterHandlerSetupException {
-		if (initialized)
-			return;
-		final String[] props = { "jmeter", "saveservice", "system", "upgrade", "user" };
-		final String suffix = ".properties";
-		try {
-			final Path tempDir = Files.createTempDirectory("jmeter-csv-parser");
-			new File(tempDir + "/bin").mkdir();
-			for (String property : props) {
-				final URL resourceUrl = Resources.getResource(property + suffix);
-				final File tmpPropFile = new File(tempDir.toString() + "/bin", property + suffix);
-				BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(tmpPropFile));
-				bufferedWriter.write(Resources.toString(resourceUrl, Charsets.UTF_8));
-				bufferedWriter.close();
+		if (!initialized) {
+			final String[] props = { "jmeter", "saveservice", "system", "upgrade", "user" };
+			final String suffix = ".properties";
+			try {
+				final Path tempDir = Files.createTempDirectory("jmeter-csv-parser");
+				new File(tempDir + "/bin").mkdir();
+				for (String property : props) {
+					final URL resourceUrl = Resources.getResource(property + suffix);
+					final File tmpPropFile = new File(tempDir.toString() + "/bin", property + suffix);
+					BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(tmpPropFile));
+					bufferedWriter.write(Resources.toString(resourceUrl, Charsets.UTF_8));
+					bufferedWriter.close();
+				}
+				JMeterUtils.loadJMeterProperties(tempDir.toString() + "/bin/jmeter.properties");
+				JMeterUtils.setJMeterHome(tempDir.toString());
+				JMeterUtils.setLocale(new Locale("ignoreResources"));
+				cacheDirectory = System.getProperty("user.home") + "/.jmeter-csv-parser/";
+				initialized = true;
+			} catch (IOException e) {
+				e.printStackTrace();
+				throw new JMeterHandlerSetupException(e.getMessage());
 			}
-			JMeterUtils.loadJMeterProperties(tempDir.toString() + "/bin/jmeter.properties");
-			JMeterUtils.setJMeterHome(tempDir.toString());
-			JMeterUtils.setLocale(new Locale("ignoreResources"));
-			cacheDirectory = System.getProperty("user.home") + "/.jmeter-csv-parser/";
-			priority = totalInstances++;
-			initialized = true;
-		} catch (IOException e) {
-			e.printStackTrace();
-			throw new JMeterHandlerSetupException(e.getMessage());
 		}
+		priority = totalInstances++;
 	}
 
 	private void openResultsFolder(final File resultsDirectory) {
@@ -178,14 +178,16 @@ public class JMeterHandler implements Callable<JMeterParsedResults>{
 	}
 
 	public static String loadtestName(String fullFilename) {
-		String resultNameBase = "RegexDidntMatch";
-		Pattern pattern = Pattern.compile("_(\\d+-\\w+)", Pattern.CASE_INSENSITIVE);
-		Matcher matcher = pattern.matcher(fullFilename);
-		if (matcher.find()) {
-			resultNameBase = matcher.group(1);
-		}
-		// with our filename scheme this should always match, unless you're
-		// being really stupid.
+		String resultNameBase = fullFilename.substring(fullFilename.lastIndexOf('/') + 1, fullFilename.lastIndexOf('.'));
+		// String resultNameBase = "RegexDidntMatch";
+		// Pattern pattern = Pattern.compile("_(\\d+-\\w+)",
+		// Pattern.CASE_INSENSITIVE);
+		// Matcher matcher = pattern.matcher(fullFilename);
+		// if (matcher.find()) {
+		// resultNameBase = matcher.group(1);
+		// }
+		// // with our filename scheme this should always match, unless you're
+		// // being really stupid.
 		return resultNameBase;
 	}
 }
