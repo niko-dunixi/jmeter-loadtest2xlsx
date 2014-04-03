@@ -16,6 +16,22 @@ public class JMeterParsedResults implements Comparable<JMeterParsedResults> {
 		this.images = images;
 	}
 
+	public int getPriority() {
+		return priority;
+	}
+
+	public String getTestName() {
+		return testName;
+	}
+
+	public Map<String, String[]> getCsvMap() {
+		return csvMap;
+	}
+
+	public ArrayList<byte[]> getImages() {
+		return images;
+	}
+
 	@Override
 	public int compareTo(JMeterParsedResults o) {
 		return this.priority - o.priority;

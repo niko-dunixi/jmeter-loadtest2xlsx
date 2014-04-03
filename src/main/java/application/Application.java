@@ -32,6 +32,9 @@ public class Application {
 		for(JMeterParsedResults j : results){
 			System.out.println(j);
 		}
+		if (results.size() > 0){
+			ExcelGenerator x = new ExcelGenerator(results);
+		}
 	}
 
 	private List<JMeterParsedResults> parserThreading(Set<String> filenames) throws JMeterHandlerSetupException, InterruptedException, ExecutionException {
