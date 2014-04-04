@@ -13,22 +13,31 @@ import application.JMeterHandlerSetupException;
 
 public class Application {
 
-	private Application(Set<String> filenames) throws JMeterHandlerSetupException, InterruptedException, ExecutionException {
-		List<JMeterParsedResults> results = parserThreading(filenames);
-		for (JMeterParsedResults j : results) {
-			System.out.println(j);
-		}
+	private Application(Set<String> filenames) throws JMeterHandlerSetupException, InterruptedException, ExecutionException, JMeterHandlerParseException {
+		// List<JMeterParsedResults> results = parseThreaded(filenames);
+		List<JMeterParsedResults> results = parseSequential(filenames);
 		if (results.size() > 0) {
 			ExcelGenerator xlsx = new ExcelGenerator(results);
 		}
 	}
 
-	private List<JMeterParsedResults> parserThreading(Set<String> filenames) throws JMeterHandlerSetupException, InterruptedException, ExecutionException {
-		ExecutorService executor = Executors.newCachedThreadPool();
+	public List<JMeterParsedResults> parseSequential(Set<String> filenames) throws JMeterHandlerSetupException, JMeterHandlerParseException {
+		List<JMeterParsedResults> results = new ArrayList<JMeterParsedResults>();
+		for (String filename : filenames) {
+			JMeterHandler loadtestParser = new JMeterHandler(filename);
+			JMeterParsedResults parsedLoadtest = loadtestParser.parseRawFile();
+			results.add(parsedLoadtest);
+			parsedLoadtest.toString();
+		}
+		return results;
+	}
+
+	private List<JMeterParsedResults> parseThreaded(Set<String> filenames) throws JMeterHandlerSetupException, InterruptedException, ExecutionException {
 		List<JMeterHandler> jmeterHandelers = new ArrayList<JMeterHandler>();
 		for (String filename : filenames) {
 			jmeterHandelers.add(new JMeterHandler(filename));
 		}
+		ExecutorService executor = Executors.newCachedThreadPool();
 		List<Future<JMeterParsedResults>> allParsers = executor.invokeAll(jmeterHandelers);
 		List<JMeterParsedResults> results = new ArrayList<JMeterParsedResults>();
 		for (Future<JMeterParsedResults> parser : allParsers) {
@@ -38,7 +47,7 @@ public class Application {
 		return results;
 	}
 
-	public static void main(String[] args) throws YourArgumentIsInvalid, JMeterHandlerSetupException, InterruptedException, ExecutionException {
+	public static void main(String[] args) throws YourArgumentIsInvalid, JMeterHandlerSetupException, InterruptedException, ExecutionException, JMeterHandlerParseException {
 		Set<String> filenames = new TreeSet<String>();
 		for (String filename : args) {
 			filenames.add(filename);
