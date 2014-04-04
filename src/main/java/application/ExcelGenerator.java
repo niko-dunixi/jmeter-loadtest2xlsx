@@ -21,6 +21,7 @@ import org.apache.poi.ss.usermodel.ConditionalFormattingRule;
 import org.apache.poi.ss.usermodel.CreationHelper;
 import org.apache.poi.ss.usermodel.DataFormat;
 import org.apache.poi.ss.usermodel.Drawing;
+import org.apache.poi.ss.usermodel.FillPatternType;
 import org.apache.poi.ss.usermodel.FontFormatting;
 import org.apache.poi.ss.usermodel.IndexedColors;
 import org.apache.poi.ss.usermodel.PatternFormatting;
@@ -56,6 +57,7 @@ public class ExcelGenerator {
 	private XSSFCellStyle hiddenStyle;
 	private XSSFCellStyle percentStyle;
 	private XSSFCellStyle titleStyle;
+	private XSSFCellStyle fillerStyle;
 	private SheetConditionalFormatting excelCondForm;
 	private ConditionalFormattingRule failRule;
 	private ConditionalFormattingRule warnRule;
@@ -103,8 +105,7 @@ public class ExcelGenerator {
 				}
 				Cell imgTitleCell = imgTitleRow.createCell(anchor.getCol1());
 				imgTitleCell.setCellValue(pictureName);
-				Picture picture = drawing.createPicture(anchor, excelDocument.addPicture(pictureMap.get(pictureName), XSSFWorkbook.PICTURE_TYPE_PNG));
-				System.out.println(picture.toString());
+				/*Picture picture = */drawing.createPicture(anchor, excelDocument.addPicture(pictureMap.get(pictureName), XSSFWorkbook.PICTURE_TYPE_PNG));
 			}
 		}
 	}
@@ -120,12 +121,18 @@ public class ExcelGenerator {
 	}
 
 	private void doFormatColumns(List<JMeterParsedResults> loadtestResults, XSSFSheet excelSheet, int maxDifferential) {
+		final int sampleWidth = 6225;
+		final int fillerWidth = 256;
 		for (int i = 0; i < loadtestResults.size(); i++) {
 			for (Integer j : hiddenColumns) {
 				excelSheet.setColumnWidth(j + (4 * i) + (maxDifferential * i), 0);
 				excelSheet.setColumnHidden(j + (4 * i) + (maxDifferential * i), true);
 			}
-			excelSheet.setColumnWidth(i * maxDifferential + i * 4, 6034); // 3.34"
+			excelSheet.setColumnWidth(i * maxDifferential + i * 4, sampleWidth);
+			if (i + 1 < loadtestResults.size()) {
+				excelSheet.setColumnWidth(i * 4 + i * maxDifferential + maxDifferential, fillerWidth);
+				excelSheet.setColumnWidth(i * 4 + i * maxDifferential + maxDifferential + 3, fillerWidth);
+			}
 		}
 	}
 
@@ -137,6 +144,10 @@ public class ExcelGenerator {
 
 		percentStyle = excelDocument.createCellStyle();
 		percentStyle.setDataFormat(format.getFormat("0.000%"));
+
+		fillerStyle = excelDocument.createCellStyle();
+		fillerStyle.setFillBackgroundColor(IndexedColors.BLACK.getIndex());
+		fillerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
 	}
 
 	public void initFont(XSSFWorkbook excelDocument) {
@@ -145,9 +156,7 @@ public class ExcelGenerator {
 		bold.setFontHeight(10d);
 		titleStyle = excelDocument.createCellStyle();
 		titleStyle.setVerticalAlignment(CellStyle.VERTICAL_CENTER);
-		// titleStyle.setWrapText(true);
-		// titleStyle.setAlignment(CellStyle.ALIGN_CENTER);
-		titleStyle.setAlignment(CellStyle.ALIGN_JUSTIFY);
+		titleStyle.setAlignment(CellStyle.ALIGN_CENTER);
 		titleStyle.setFont(bold);
 	}
 
@@ -205,22 +214,10 @@ public class ExcelGenerator {
 
 	public void doRowSampleCompairColumns(List<JMeterParsedResults> loadtestResults, int row, boolean comparableRow, int currentDifferential, Row currentRow, int i) {
 		if (comparableRow && i + 1 < loadtestResults.size()) {
-			Cell avgCell = currentRow.createCell(currentDifferential + 1);
-			{
-				CellRangeAddress[] singleCellRange = new CellRangeAddress[1];
-				singleCellRange[0] = new CellRangeAddress(avgCell.getRowIndex(), avgCell.getRowIndex(), avgCell.getColumnIndex(), avgCell.getColumnIndex());
-				excelCondForm.addConditionalFormatting(singleCellRange, failRule, warnRule);
-			}
-			String avgCellFormula = CellReference.convertNumToColString(currentDifferential + 6) + (row + 1) + " / " + CellReference.convertNumToColString(currentDifferential - 9)
-					+ (row + 1);
-			avgCell.setCellFormula(avgCellFormula);
-			avgCell.setCellStyle(percentStyle);
-			// Error Comparison Column
-			Cell errCell = currentRow.createCell(currentDifferential + 2);
-			String errCellFormula = CellReference.convertNumToColString(currentDifferential + 11) + (row + 1) + " - "
-					+ CellReference.convertNumToColString(currentDifferential - 4) + (row + 1);
-			errCell.setCellFormula(errCellFormula);
-			errCell.setCellStyle(percentStyle);
+			doAverageCell(row, currentDifferential, currentRow);
+			doErrorCell(row, currentDifferential, currentRow);
+			doFillerCell(currentRow, currentDifferential + 0);
+			doFillerCell(currentRow, currentDifferential + 3);
 		} else if (!comparableRow && i + 1 < loadtestResults.size()) {
 			Cell avgCell = currentRow.createCell(currentDifferential + 1);
 			avgCell.setCellValue("Avg / Avg");
@@ -229,6 +226,32 @@ public class ExcelGenerator {
 			errCell.setCellValue("Δ Error");
 			errCell.setCellStyle(titleStyle);
 		}
+	}
+
+	public void doFillerCell(Row currentRow, int columnIndex) {
+		Cell fillerCell = currentRow.createCell(columnIndex);
+		fillerCell.setCellStyle(fillerStyle);
+	}
+
+	public void doAverageCell(int row, int currentDifferential, Row currentRow) {
+		Cell avgCell = currentRow.createCell(currentDifferential + 1);
+		{
+			CellRangeAddress[] singleCellRange = new CellRangeAddress[1];
+			singleCellRange[0] = new CellRangeAddress(avgCell.getRowIndex(), avgCell.getRowIndex(), avgCell.getColumnIndex(), avgCell.getColumnIndex());
+			excelCondForm.addConditionalFormatting(singleCellRange, failRule, warnRule);
+		}
+		String avgCellFormula = CellReference.convertNumToColString(currentDifferential + 6) + (row + 1) + " / " + CellReference.convertNumToColString(currentDifferential - 9)
+				+ (row + 1);
+		avgCell.setCellFormula(avgCellFormula);
+		avgCell.setCellStyle(percentStyle);
+	}
+
+	public void doErrorCell(int row, int currentDifferential, Row currentRow) {
+		Cell errCell = currentRow.createCell(currentDifferential + 2);
+		String errCellFormula = CellReference.convertNumToColString(currentDifferential + 11) + (row + 1) + " - " + CellReference.convertNumToColString(currentDifferential - 4)
+				+ (row + 1);
+		errCell.setCellFormula(errCellFormula);
+		errCell.setCellStyle(percentStyle);
 	}
 
 	private int doExcelBody(List<JMeterParsedResults> loadtestResults, XSSFSheet excelSheet, int maxDifferential, SortedSet<String> sampleNames) {
