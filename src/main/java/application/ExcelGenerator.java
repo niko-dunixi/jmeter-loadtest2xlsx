@@ -13,15 +13,22 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.Iterator;
 
+import org.apache.poi.hssf.record.CFRuleRecord.ComparisonOperator;
 import org.apache.poi.hssf.util.CellReference;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.ClientAnchor;
+import org.apache.poi.ss.usermodel.ConditionalFormattingRule;
 import org.apache.poi.ss.usermodel.CreationHelper;
 import org.apache.poi.ss.usermodel.DataFormat;
 import org.apache.poi.ss.usermodel.Drawing;
+import org.apache.poi.ss.usermodel.FontFormatting;
+import org.apache.poi.ss.usermodel.IndexedColors;
+import org.apache.poi.ss.usermodel.PatternFormatting;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Picture;
+import org.apache.poi.ss.usermodel.SheetConditionalFormatting;
+import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.usermodel.XSSFCellStyle;
 import org.apache.poi.xssf.usermodel.XSSFColor;
 import org.apache.poi.xssf.usermodel.XSSFFont;
@@ -53,12 +60,15 @@ public class ExcelGenerator {
 	private XSSFCellStyle titleStyle;
 	private XSSFCellStyle failStyle;
 	private XSSFCellStyle warnStyle;
+	private SheetConditionalFormatting excelCondForm;
+	private ConditionalFormattingRule failRule;
+	private ConditionalFormattingRule warnRule;
 
 	ExcelGenerator(List<JMeterParsedResults> loadtestResults) {
 
 		XSSFWorkbook excelDocument = new XSSFWorkbook();
-		initStyles(excelDocument);
 		XSSFSheet excelSheet = excelDocument.createSheet("JMeter");
+		initStyles(excelDocument, excelSheet);
 
 		int maxDifferential = loadtestResults.get(0).getCsvMap().get("CSVHEADER").length;
 		SortedSet<String> sampleNames = initSampleNames(loadtestResults);
@@ -68,9 +78,14 @@ public class ExcelGenerator {
 		doRowSample(loadtestResults, excelSheet, maxDifferential, lastRow++, "TOTAL", true);
 		doFormatColumns(loadtestResults, excelSheet, maxDifferential);
 		lastRow += 4;
+		doGraphs(loadtestResults, excelDocument, excelSheet, maxDifferential, lastRow);
+
+		saveExcelToFile(excelDocument);
+	}
+
+	public void doGraphs(List<JMeterParsedResults> loadtestResults, XSSFWorkbook excelDocument, XSSFSheet excelSheet, int maxDifferential, int lastRow) {
 		CreationHelper creationHelper = excelDocument.getCreationHelper();
 		Drawing drawing = excelSheet.createDrawingPatriarch();
-		// for(JMeterParsedResults loadtest : loadtestResults){
 		for (int i = 0; i < loadtestResults.size(); i++) {
 			Map<String, byte[]> pictureMap = loadtestResults.get(i).getImages();
 			Set<String> pictureNames = pictureMap.keySet();
@@ -93,8 +108,6 @@ public class ExcelGenerator {
 				Picture picture = drawing.createPicture(anchor, excelDocument.addPicture(pictureMap.get(pictureName), XSSFWorkbook.PICTURE_TYPE_PNG));
 			}
 		}
-
-		saveExcelToFile(excelDocument);
 	}
 
 	private SortedSet<String> initSampleNames(List<JMeterParsedResults> loadtestResults) {
@@ -118,7 +131,7 @@ public class ExcelGenerator {
 		}
 	}
 
-	private void initStyles(XSSFWorkbook excelDocument) {
+	private void initStyles(XSSFWorkbook excelDocument, XSSFSheet excelSheet) {
 		DataFormat format = excelDocument.createDataFormat();
 		hiddenStyle = excelDocument.createCellStyle();
 		hiddenStyle.setHidden(true);
@@ -132,24 +145,30 @@ public class ExcelGenerator {
 		bold.setFontHeight(10d);
 		titleStyle = excelDocument.createCellStyle();
 		titleStyle.setVerticalAlignment(CellStyle.VERTICAL_CENTER);
+		// titleStyle.setWrapText(true);
 		// titleStyle.setAlignment(CellStyle.ALIGN_CENTER);
 		titleStyle.setAlignment(CellStyle.ALIGN_JUSTIFY);
 		titleStyle.setFont(bold);
 
-		XSSFFont failFont = excelDocument.createFont();
-		failFont.setColor(new XSSFColor(new Color(255, 0, 0)));
-		failStyle = excelDocument.createCellStyle();
-		failStyle.setFont(failFont);
+		excelCondForm = excelSheet.getSheetConditionalFormatting();
+		failRule = excelCondForm.createConditionalFormattingRule(ComparisonOperator.GT, "119%");
+		FontFormatting failFont = failRule.createFontFormatting();
+		failFont.setFontStyle(false, true);
+		failFont.setFontColorIndex(IndexedColors.RED.getIndex());
+		PatternFormatting failPattern = failRule.createPatternFormatting();
+		failPattern.setFillBackgroundColor(IndexedColors.BLACK.getIndex());
 
-		XSSFFont warnFont = excelDocument.createFont();
-		warnFont.setColor(new XSSFColor(new Color(255, 255, 0)));
-		warnStyle = excelDocument.createCellStyle();
-		warnStyle.setFont(warnFont);
+		warnRule = excelCondForm.createConditionalFormattingRule(ComparisonOperator.GT, "109%");
+		FontFormatting warnFont = warnRule.createFontFormatting();
+		warnFont.setFontStyle(false, true);
+		warnFont.setFontColorIndex(IndexedColors.YELLOW.getIndex());
+		PatternFormatting warnPattern = warnRule.createPatternFormatting();
+		warnPattern.setFillBackgroundColor(IndexedColors.BLACK.getIndex());
 	}
 
-	private void doRowSample(List<JMeterParsedResults> loadtestResults, XSSFSheet excelSheet, int maxDifferential, int row, String sample, boolean compairisonColumns) {
+	private void doRowSample(List<JMeterParsedResults> loadtestResults, XSSFSheet excelSheet, int maxDifferential, int row, String sample, boolean comparableRow) {
 		int currentDifferential = 0;
-		Row currentRow = excelSheet.createRow(row);// excelSheet.getRow(row);
+		Row currentRow = excelSheet.createRow(row);
 		for (int i = 0; i < loadtestResults.size(); i++) {
 			JMeterParsedResults currentResults = loadtestResults.get(i);
 			if (currentResults.getCsvMap().containsKey(sample)) {
@@ -161,19 +180,24 @@ public class ExcelGenerator {
 					} catch (NumberFormatException e) {
 						currentCell.setCellValue(summaryData[j]);
 					}
-					if (!compairisonColumns) {
+					if (!comparableRow) {
 						currentCell.setCellStyle(titleStyle);
 					}
-					if (compairisonColumns && percentageColumn.contains(j)) {
+					if (comparableRow && percentageColumn.contains(j)) {
 						currentCell.setCellStyle(percentStyle);
 					}
 				}
 			}
 			currentDifferential += maxDifferential;
 			// System.out.println(currentDifferential);
-			if (compairisonColumns && i + 1 < loadtestResults.size()) {
+			if (comparableRow && i + 1 < loadtestResults.size()) {
 				// Average Response Times Comparison Column
 				Cell avgCell = currentRow.createCell(currentDifferential + 1);
+				{
+					CellRangeAddress[] singleCellRange = new CellRangeAddress[1];
+					singleCellRange[0] = new CellRangeAddress(avgCell.getRowIndex(), avgCell.getRowIndex(), avgCell.getColumnIndex(), avgCell.getColumnIndex());
+					excelCondForm.addConditionalFormatting(singleCellRange, failRule, warnRule);
+				}
 				String avgCellFormula = CellReference.convertNumToColString(currentDifferential + 6) + (row + 1) + " / "
 						+ CellReference.convertNumToColString(currentDifferential - 9) + (row + 1);
 				avgCell.setCellFormula(avgCellFormula);
@@ -184,7 +208,7 @@ public class ExcelGenerator {
 						+ CellReference.convertNumToColString(currentDifferential - 4) + (row + 1);
 				errCell.setCellFormula(errCellFormula);
 				errCell.setCellStyle(percentStyle);
-			} else if (!compairisonColumns && i + 1 < loadtestResults.size()) {
+			} else if (!comparableRow && i + 1 < loadtestResults.size()) {
 				Cell avgCell = currentRow.createCell(currentDifferential + 1);
 				avgCell.setCellValue("Avg / Avg");
 				avgCell.setCellStyle(titleStyle);

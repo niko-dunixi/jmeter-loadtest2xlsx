@@ -2,3 +2,4 @@
 *.swp
 *.swo
 lazy-build-run.log
+/target
