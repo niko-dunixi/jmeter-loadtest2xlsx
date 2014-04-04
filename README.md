@@ -1,4 +1,4 @@
-##Jmeter-Csv-Parser##
+##JMeter Loadtest 2 Xlsx##
 ###Overview###
 A really simple loadtest analyzer that can chain as many loadtests as the command line will let you enter.
 
