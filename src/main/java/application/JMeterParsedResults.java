@@ -13,6 +13,22 @@ public class JMeterParsedResults implements Comparable<JMeterParsedResults> {
 		this.testName = testName;
 		this.csvMap = csvMap;
 		this.images = images;
+		humanReadableTitles();
+	}
+
+	public void humanReadableTitles() {
+		String[] tmpMap = getCsvMap().get("CSVHEADER");
+		tmpMap[0] = getTestName();
+		tmpMap[1] = "Count";
+		tmpMap[2] = "Avg";
+		tmpMap[3] = "Med";
+		// tmpMap[4] = "90% Line";
+		tmpMap[5] = "Min";
+		tmpMap[6] = "Max";
+		tmpMap[7] = "Err%";
+		tmpMap[8] = "Rate";
+		// tmpMap[9] = "Bandwidth";
+		tmpMap[10] = "StdDev";
 	}
 
 	public int getPriority() {

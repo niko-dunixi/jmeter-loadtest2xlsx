@@ -1,6 +1,5 @@
 package application;
 
-import java.awt.Color;
 import java.awt.Desktop;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -30,7 +29,6 @@ import org.apache.poi.ss.usermodel.Picture;
 import org.apache.poi.ss.usermodel.SheetConditionalFormatting;
 import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.usermodel.XSSFCellStyle;
-import org.apache.poi.xssf.usermodel.XSSFColor;
 import org.apache.poi.xssf.usermodel.XSSFFont;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
@@ -58,8 +56,6 @@ public class ExcelGenerator {
 	private XSSFCellStyle hiddenStyle;
 	private XSSFCellStyle percentStyle;
 	private XSSFCellStyle titleStyle;
-	private XSSFCellStyle failStyle;
-	private XSSFCellStyle warnStyle;
 	private SheetConditionalFormatting excelCondForm;
 	private ConditionalFormattingRule failRule;
 	private ConditionalFormattingRule warnRule;
@@ -68,7 +64,9 @@ public class ExcelGenerator {
 
 		XSSFWorkbook excelDocument = new XSSFWorkbook();
 		XSSFSheet excelSheet = excelDocument.createSheet("JMeter");
-		initStyles(excelDocument, excelSheet);
+		initStyles(excelDocument);
+		initFont(excelDocument);
+		initCondForm(excelSheet);
 
 		int maxDifferential = loadtestResults.get(0).getCsvMap().get("CSVHEADER").length;
 		SortedSet<String> sampleNames = initSampleNames(loadtestResults);
@@ -106,6 +104,7 @@ public class ExcelGenerator {
 				Cell imgTitleCell = imgTitleRow.createCell(anchor.getCol1());
 				imgTitleCell.setCellValue(pictureName);
 				Picture picture = drawing.createPicture(anchor, excelDocument.addPicture(pictureMap.get(pictureName), XSSFWorkbook.PICTURE_TYPE_PNG));
+				System.out.println(picture.toString());
 			}
 		}
 	}
@@ -114,7 +113,6 @@ public class ExcelGenerator {
 		SortedSet<String> sampleNames = new TreeSet<String>();
 		for (JMeterParsedResults loadtest : loadtestResults) {
 			sampleNames.addAll(loadtest.getCsvMap().keySet());
-			loadtest.getCsvMap().get("CSVHEADER")[0] = loadtest.getTestName();
 		}
 		sampleNames.remove("CSVHEADER");
 		sampleNames.remove("TOTAL");
@@ -131,7 +129,7 @@ public class ExcelGenerator {
 		}
 	}
 
-	private void initStyles(XSSFWorkbook excelDocument, XSSFSheet excelSheet) {
+	private void initStyles(XSSFWorkbook excelDocument) {
 		DataFormat format = excelDocument.createDataFormat();
 		hiddenStyle = excelDocument.createCellStyle();
 		hiddenStyle.setHidden(true);
@@ -139,7 +137,9 @@ public class ExcelGenerator {
 
 		percentStyle = excelDocument.createCellStyle();
 		percentStyle.setDataFormat(format.getFormat("0.000%"));
+	}
 
+	public void initFont(XSSFWorkbook excelDocument) {
 		XSSFFont bold = excelDocument.createFont();
 		bold.setBold(true);
 		bold.setFontHeight(10d);
@@ -149,7 +149,9 @@ public class ExcelGenerator {
 		// titleStyle.setAlignment(CellStyle.ALIGN_CENTER);
 		titleStyle.setAlignment(CellStyle.ALIGN_JUSTIFY);
 		titleStyle.setFont(bold);
+	}
 
+	public void initCondForm(XSSFSheet excelSheet) {
 		excelCondForm = excelSheet.getSheetConditionalFormatting();
 		failRule = excelCondForm.createConditionalFormattingRule(ComparisonOperator.GT, "119%");
 		FontFormatting failFont = failRule.createFontFormatting();
@@ -170,53 +172,62 @@ public class ExcelGenerator {
 		int currentDifferential = 0;
 		Row currentRow = excelSheet.createRow(row);
 		for (int i = 0; i < loadtestResults.size(); i++) {
-			JMeterParsedResults currentResults = loadtestResults.get(i);
-			if (currentResults.getCsvMap().containsKey(sample)) {
-				String[] summaryData = currentResults.getCsvMap().get(sample);
-				for (int j = 0; j < summaryData.length; j++) {
-					Cell currentCell = currentRow.createCell(currentDifferential + j);
-					try {
-						currentCell.setCellValue(Double.parseDouble(summaryData[j]));
-					} catch (NumberFormatException e) {
-						currentCell.setCellValue(summaryData[j]);
-					}
-					if (!comparableRow) {
-						currentCell.setCellStyle(titleStyle);
-					}
-					if (comparableRow && percentageColumn.contains(j)) {
-						currentCell.setCellStyle(percentStyle);
-					}
-				}
-			}
+			doRowSampleTestStats(loadtestResults, sample, comparableRow, currentDifferential, currentRow, i);
 			currentDifferential += maxDifferential;
-			// System.out.println(currentDifferential);
-			if (comparableRow && i + 1 < loadtestResults.size()) {
-				// Average Response Times Comparison Column
-				Cell avgCell = currentRow.createCell(currentDifferential + 1);
-				{
-					CellRangeAddress[] singleCellRange = new CellRangeAddress[1];
-					singleCellRange[0] = new CellRangeAddress(avgCell.getRowIndex(), avgCell.getRowIndex(), avgCell.getColumnIndex(), avgCell.getColumnIndex());
-					excelCondForm.addConditionalFormatting(singleCellRange, failRule, warnRule);
-				}
-				String avgCellFormula = CellReference.convertNumToColString(currentDifferential + 6) + (row + 1) + " / "
-						+ CellReference.convertNumToColString(currentDifferential - 9) + (row + 1);
-				avgCell.setCellFormula(avgCellFormula);
-				avgCell.setCellStyle(percentStyle);
-				// Error Comparison Column
-				Cell errCell = currentRow.createCell(currentDifferential + 2);
-				String errCellFormula = CellReference.convertNumToColString(currentDifferential + 11) + (row + 1) + " - "
-						+ CellReference.convertNumToColString(currentDifferential - 4) + (row + 1);
-				errCell.setCellFormula(errCellFormula);
-				errCell.setCellStyle(percentStyle);
-			} else if (!comparableRow && i + 1 < loadtestResults.size()) {
-				Cell avgCell = currentRow.createCell(currentDifferential + 1);
-				avgCell.setCellValue("Avg / Avg");
-				avgCell.setCellStyle(titleStyle);
-				Cell errCell = currentRow.createCell(currentDifferential + 2);
-				errCell.setCellValue("Δ Error");
-				errCell.setCellStyle(titleStyle);
-			}
+			doRowSampleCompairColumns(loadtestResults, row, comparableRow, currentDifferential, currentRow, i);
 			currentDifferential += 4;
+		}
+		if (!comparableRow) {
+			currentRow.setHeight((short) 400);
+		}
+	}
+
+	public void doRowSampleTestStats(List<JMeterParsedResults> loadtestResults, String sample, boolean comparableRow, int currentDifferential, Row currentRow, int i) {
+		JMeterParsedResults currentResults = loadtestResults.get(i);
+		if (currentResults.getCsvMap().containsKey(sample)) {
+			String[] summaryData = currentResults.getCsvMap().get(sample);
+			for (int j = 0; j < summaryData.length; j++) {
+				Cell currentCell = currentRow.createCell(currentDifferential + j);
+				try {
+					currentCell.setCellValue(Double.parseDouble(summaryData[j]));
+				} catch (NumberFormatException e) {
+					currentCell.setCellValue(summaryData[j]);
+				}
+				if (!comparableRow) {
+					currentCell.setCellStyle(titleStyle);
+				}
+				if (comparableRow && percentageColumn.contains(j)) {
+					currentCell.setCellStyle(percentStyle);
+				}
+			}
+		}
+	}
+
+	public void doRowSampleCompairColumns(List<JMeterParsedResults> loadtestResults, int row, boolean comparableRow, int currentDifferential, Row currentRow, int i) {
+		if (comparableRow && i + 1 < loadtestResults.size()) {
+			Cell avgCell = currentRow.createCell(currentDifferential + 1);
+			{
+				CellRangeAddress[] singleCellRange = new CellRangeAddress[1];
+				singleCellRange[0] = new CellRangeAddress(avgCell.getRowIndex(), avgCell.getRowIndex(), avgCell.getColumnIndex(), avgCell.getColumnIndex());
+				excelCondForm.addConditionalFormatting(singleCellRange, failRule, warnRule);
+			}
+			String avgCellFormula = CellReference.convertNumToColString(currentDifferential + 6) + (row + 1) + " / " + CellReference.convertNumToColString(currentDifferential - 9)
+					+ (row + 1);
+			avgCell.setCellFormula(avgCellFormula);
+			avgCell.setCellStyle(percentStyle);
+			// Error Comparison Column
+			Cell errCell = currentRow.createCell(currentDifferential + 2);
+			String errCellFormula = CellReference.convertNumToColString(currentDifferential + 11) + (row + 1) + " - "
+					+ CellReference.convertNumToColString(currentDifferential - 4) + (row + 1);
+			errCell.setCellFormula(errCellFormula);
+			errCell.setCellStyle(percentStyle);
+		} else if (!comparableRow && i + 1 < loadtestResults.size()) {
+			Cell avgCell = currentRow.createCell(currentDifferential + 1);
+			avgCell.setCellValue("Avg / Avg");
+			avgCell.setCellStyle(titleStyle);
+			Cell errCell = currentRow.createCell(currentDifferential + 2);
+			errCell.setCellValue("Δ Error");
+			errCell.setCellStyle(titleStyle);
 		}
 	}
 
