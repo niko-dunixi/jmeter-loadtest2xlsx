@@ -13,10 +13,13 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Random;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import java.util.concurrent.Callable;
 
 import org.apache.commons.codec.digest.DigestUtils;
@@ -31,8 +34,9 @@ import kg.apc.jmeter.PluginsCMDWorker;
 
 public class JMeterHandler implements Callable<JMeterParsedResults> {
 
-	private static boolean initialized = false;
-	private static int totalInstances = 0;
+	private final static Random rand = new Random();
+	private volatile static boolean initialized = false;
+	private volatile static int totalInstances = 0;
 	private int priority = 0;
 	private static String cacheDirectory;
 	private final String rawResultsFilename;
@@ -41,22 +45,28 @@ public class JMeterHandler implements Callable<JMeterParsedResults> {
 
 	public JMeterHandler(String filename) throws JMeterHandlerSetupException {
 		rawResultsFilename = filename;
-		setupJMeter();
+		priority = setupJMeter();
 	}
 
 	@Override
-	public JMeterParsedResults call() throws JMeterHandlerParseException {
+	public JMeterParsedResults call() throws JMeterHandlerParseException, InterruptedException {
+		int min = 10, max = 30;
+		Thread.sleep(rand.nextInt(max - min + 1) + min);
+		return parseRawFile();
+	}
+
+	public synchronized JMeterParsedResults parseRawFile() throws JMeterHandlerParseException {
 		final String testIdentifier = loadtestIdentifier(rawResultsFilename);
 		final String testNamePrefix = loadtestName(rawResultsFilename);
 		final File resultsDirectory = new File(cacheDirectory + testIdentifier);
 		resultsDirectory.mkdirs();
 		openResultsFolder(resultsDirectory);
 		Map<String, String[]> csvSummary = parseSummary(testNamePrefix, resultsDirectory);
-		ArrayList<byte[]> allGraphs = parseGraphs(testNamePrefix, resultsDirectory);
+		Map<String, byte[]> allGraphs = parseGraphs(testNamePrefix, resultsDirectory);
 		return new JMeterParsedResults(priority, testNamePrefix, csvSummary, allGraphs);
 	}
 
-	public synchronized void setupJMeter() throws JMeterHandlerSetupException {
+	public static synchronized int setupJMeter() throws JMeterHandlerSetupException {
 		if (!initialized) {
 			final String[] props = { "jmeter", "saveservice", "system", "upgrade", "user" };
 			final String suffix = ".properties";
@@ -80,7 +90,7 @@ public class JMeterHandler implements Callable<JMeterParsedResults> {
 				throw new JMeterHandlerSetupException(e.getMessage());
 			}
 		}
-		priority = totalInstances++;
+		return totalInstances++;
 	}
 
 	private void openResultsFolder(final File resultsDirectory) {
@@ -123,7 +133,7 @@ public class JMeterHandler implements Callable<JMeterParsedResults> {
 		return csvMap;
 	}
 
-	private ArrayList<byte[]> parseGraphs(final String resultNamePrefix, final File resultsDirectory) throws JMeterHandlerParseException {
+	private Map<String, byte[]> parseGraphs(final String resultNamePrefix, final File resultsDirectory) throws JMeterHandlerParseException {
 		final String[] graphModes = { "TransactionsPerSecond", "ResponseTimesOverTime" };
 
 		final PluginsCMDWorker worker = new PluginsCMDWorker();
@@ -135,14 +145,20 @@ public class JMeterHandler implements Callable<JMeterParsedResults> {
 		worker.setRelativeTimes(0);
 		worker.setAutoScaleRows(0);
 
-		ArrayList<byte[]> resultingImages = new ArrayList<byte[]>();
+		// ArrayList<byte[]> resultingImages = new ArrayList<byte[]>();
+		SortedMap<String, byte[]> resultingImages = new TreeMap<String, byte[]>(new Comparator<String>() {
+			@Override
+			public int compare(String o1, String o2) {
+				return o1.compareTo(o2) * -1;
+			}
+		});
 		{ // graph files
 			worker.addExportMode(PluginsCMDWorker.EXPORT_PNG);
 			for (String graphMode : graphModes) {
 				worker.setPluginType(graphMode);
-				for (int i = 1; i >= 0; i--) {
-					worker.setSuccessFilter(i);
-					final String resultNameFull = resultNamePrefix + "_" + graphMode + "_" + (i == 0 ? "Fail" : "Success") + ".png";
+				for (int j = 0; j < 2; j++) {
+					worker.setSuccessFilter(j);
+					final String resultNameFull = resultNamePrefix + "_" + graphMode + "_" + (j == 0 ? "Fail" : "Success") + ".png";
 					Path path = Paths.get(resultsDirectory.toString() + "/" + resultNameFull);
 					if (!Files.exists(path)) {
 						worker.setOutputPNGFile(path.toString());
@@ -155,7 +171,7 @@ public class JMeterHandler implements Callable<JMeterParsedResults> {
 					}
 					try (InputStream is = new FileInputStream(path.toFile())) {
 						byte[] bytes = IOUtils.toByteArray(is);
-						resultingImages.add(bytes);
+						resultingImages.put(resultNameFull, bytes);
 					} catch (IOException e) {
 						throw new JMeterHandlerParseException(-1);
 					}
@@ -177,7 +193,7 @@ public class JMeterHandler implements Callable<JMeterParsedResults> {
 
 	public static String loadtestName(String fullFilename) {
 		String resultNameBase = fullFilename.substring(fullFilename.lastIndexOf('/') + 1, fullFilename.lastIndexOf('.'));
-		if (resultNameBase.startsWith("JmeterRawResults_")){
+		if (resultNameBase.startsWith("JmeterRawResults_")) {
 			resultNameBase = resultNameBase.substring(17);
 		}
 		return resultNameBase;

@@ -7,6 +7,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.Iterator;
@@ -70,18 +72,25 @@ public class ExcelGenerator {
 		Drawing drawing = excelSheet.createDrawingPatriarch();
 		// for(JMeterParsedResults loadtest : loadtestResults){
 		for (int i = 0; i < loadtestResults.size(); i++) {
-			List<byte[]> pictureArray = loadtestResults.get(i).getImages();
-			for (int j = 0; j < pictureArray.size(); j++) {
+			Map<String, byte[]> pictureMap = loadtestResults.get(i).getImages();
+			Set<String> pictureNames = pictureMap.keySet();
+			int j = 0;
+			for (Iterator<String> pictureNameIterator = pictureNames.iterator(); pictureNameIterator.hasNext(); j++) {
+				String pictureName = pictureNameIterator.next();
 				ClientAnchor anchor = creationHelper.createClientAnchor();
-				//anchor.setCol1((maxDifferential * i) + (4 * i) + maxDifferential);
-				//anchor.setRow1(lastRow + j * 10);
+				final int width = maxDifferential + 2;
 				anchor.setCol1(i * maxDifferential + i * 4);
-				anchor.setCol2(anchor.getCol1() + maxDifferential);
-			    anchor.setRow1(lastRow + j * 16);
-			    anchor.setRow2(anchor.getRow1() + 16);
-			    
-				Picture pict = drawing.createPicture(anchor, excelDocument.addPicture(pictureArray.get(j), XSSFWorkbook.PICTURE_TYPE_PNG));
-				// pict.resize();
+				anchor.setCol2(anchor.getCol1() + width);
+				final int height = 20;
+				anchor.setRow1(lastRow + j * height + 1);
+				anchor.setRow2(anchor.getRow1() + height - 1);
+				Row imgTitleRow = excelSheet.getRow(anchor.getRow1() - 1);
+				if (imgTitleRow == null) {
+					imgTitleRow = excelSheet.createRow(anchor.getRow1() - 1);
+				}
+				Cell imgTitleCell = imgTitleRow.createCell(anchor.getCol1());
+				imgTitleCell.setCellValue(pictureName);
+				Picture picture = drawing.createPicture(anchor, excelDocument.addPicture(pictureMap.get(pictureName), XSSFWorkbook.PICTURE_TYPE_PNG));
 			}
 		}
 
@@ -143,19 +152,21 @@ public class ExcelGenerator {
 		Row currentRow = excelSheet.createRow(row);// excelSheet.getRow(row);
 		for (int i = 0; i < loadtestResults.size(); i++) {
 			JMeterParsedResults currentResults = loadtestResults.get(i);
-			String[] summaryData = currentResults.getCsvMap().get(sample);
-			for (int j = 0; j < summaryData.length; j++) {
-				Cell currentCell = currentRow.createCell(currentDifferential + j);
-				try {
-					currentCell.setCellValue(Double.parseDouble(summaryData[j]));
-				} catch (NumberFormatException e) {
-					currentCell.setCellValue(summaryData[j]);
-				}
-				if (!compairisonColumns) {
-					currentCell.setCellStyle(titleStyle);
-				}
-				if (compairisonColumns && percentageColumn.contains(j)) {
-					currentCell.setCellStyle(percentStyle);
+			if (currentResults.getCsvMap().containsKey(sample)) {
+				String[] summaryData = currentResults.getCsvMap().get(sample);
+				for (int j = 0; j < summaryData.length; j++) {
+					Cell currentCell = currentRow.createCell(currentDifferential + j);
+					try {
+						currentCell.setCellValue(Double.parseDouble(summaryData[j]));
+					} catch (NumberFormatException e) {
+						currentCell.setCellValue(summaryData[j]);
+					}
+					if (!compairisonColumns) {
+						currentCell.setCellStyle(titleStyle);
+					}
+					if (compairisonColumns && percentageColumn.contains(j)) {
+						currentCell.setCellStyle(percentStyle);
+					}
 				}
 			}
 			currentDifferential += maxDifferential;
