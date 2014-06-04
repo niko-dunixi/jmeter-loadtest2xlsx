@@ -1,6 +1,9 @@
 ##JMeter Loadtest 2 Xlsx##
-###Overview###
+
+###To Do###
 This is something I feel should be redone. It gets the job done, but I wrote this during a time period I was constantly sick and feverish. Letting mortality get to me, I think this could be optimized and flow can be made a little more clear as well
+
+###Overview###
 A really simple loadtest analyzer that can chain as many loadtests as the command line will let you enter.
 
 ###Usage###
